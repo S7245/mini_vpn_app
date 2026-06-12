@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-vpn/local-control.schema.json",
+  "title": "local-control message",
+  "description": "① GUI<->core control messages. Semantics only; the transport (unix socket / XPC / FFI) is bound later when wiring to the core.",
+  "oneOf": [
+    { "$ref": "#/$defs/CmdConnect" },
+    { "$ref": "#/$defs/CmdDisconnect" },
+    { "$ref": "#/$defs/CmdSelectNode" },
+    { "$ref": "#/$defs/CmdAuto" },
+    { "$ref": "#/$defs/EvtState" },
+    { "$ref": "#/$defs/EvtStats" },
+    { "$ref": "#/$defs/EvtLog" }
+  ],
+  "$defs": {
+    "CmdConnect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "node_id"],
+      "properties": {
+        "type": { "const": "connect" },
+        "node_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "CmdDisconnect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "disconnect" } }
+    },
+    "CmdSelectNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "node_id"],
+      "properties": {
+        "type": { "const": "select_node" },
+        "node_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "CmdAuto": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": { "type": { "const": "auto" } }
+    },
+    "EvtState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "state"],
+      "properties": {
+        "type": { "const": "state" },
+        "state": { "enum": ["disconnected", "connecting", "connected", "error"] }
+      }
+    },
+    "EvtStats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "up_bps", "down_bps", "up_bytes", "down_bytes"],
+      "properties": {
+        "type": { "const": "stats" },
+        "up_bps": { "type": "integer", "minimum": 0 },
+        "down_bps": { "type": "integer", "minimum": 0 },
+        "up_bytes": { "type": "integer", "minimum": 0 },
+        "down_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "EvtLog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "level", "message", "ts"],
+      "properties": {
+        "type": { "const": "log" },
+        "level": { "enum": ["debug", "info", "warn", "error"] },
+        "message": { "type": "string" },
+        "ts": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
