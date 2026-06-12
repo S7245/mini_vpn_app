@@ -326,3 +326,25 @@ paths:
               example:
                 node_id: 44444444-4444-4444-8444-444444444444
                 reason: lowest latency among eligible nodes
+  /purchases/subscription:
+    post:
+      operationId: purchaseSubscription
+      summary: (stub) Buy/renew a subscription — not implemented this version
+      responses:
+        '501':
+          description: not implemented
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: not_implemented, message: payment not available yet }
+  /purchases/dedicated-ip:
+    post:
+      operationId: purchaseDedicatedIp
+      summary: (stub) Buy a dedicated static IP — not implemented this version
+      responses:
+        '501':
+          description: not implemented
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: not_implemented, message: payment not available yet }
