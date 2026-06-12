@@ -25,4 +25,116 @@ components:
       properties:
         code: { type: string }
         message: { type: string }
-paths: {}
+    User:
+      type: object
+      required: [id, email, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, const: Bearer }
+        expires_in: { type: integer, description: access token lifetime in seconds }
+    Credentials:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    ChangePasswordRequest:
+      type: object
+      required: [old_password, new_password]
+      properties:
+        old_password: { type: string }
+        new_password: { type: string, minLength: 8 }
+paths:
+  /auth/register:
+    post:
+      operationId: register
+      summary: Create an account
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+              example:
+                access_token: demo.access
+                refresh_token: demo.refresh
+                token_type: Bearer
+                expires_in: 3600
+  /auth/login:
+    post:
+      operationId: login
+      summary: Exchange credentials for tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Credentials' }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+              example:
+                access_token: demo.access
+                refresh_token: demo.refresh
+                token_type: Bearer
+                expires_in: 3600
+  /auth/refresh:
+    post:
+      operationId: refresh
+      summary: Exchange a refresh token for a new token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenPair' }
+              example:
+                access_token: demo.access2
+                refresh_token: demo.refresh2
+                token_type: Bearer
+                expires_in: 3600
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Revoke the current refresh token
+      responses:
+        '204': { description: no content }
+  /auth/password:
+    put:
+      operationId: changePassword
+      summary: Change the account password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204': { description: no content }

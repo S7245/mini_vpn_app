@@ -11,7 +11,8 @@ const root = resolve(here, '..');
 
 // mock file (under contracts/mock/) -> component schema name it must satisfy
 const manifest = {
-  // populated by later tasks, e.g. 'user.json': 'User'
+  'user.json': 'User',
+  'token-pair.json': 'TokenPair',
 };
 
 const api = YAML.parse(readFileSync(resolve(root, 'backend-api.openapi.yaml'), 'utf8'));
