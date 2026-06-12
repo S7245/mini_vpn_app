@@ -68,6 +68,29 @@ components:
           format: date-time
           description: null for the free plan
         device_limit: { type: integer, minimum: 1 }
+    Device:
+      type: object
+      required: [id, name, platform, last_seen_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        platform: { type: string, enum: [macos, ios, android, windows] }
+        last_seen_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+    DeviceList:
+      type: object
+      required: [devices, device_limit]
+      properties:
+        devices:
+          type: array
+          items: { $ref: '#/components/schemas/Device' }
+        device_limit: { type: integer, minimum: 1 }
+    DeviceRegistration:
+      type: object
+      required: [name, platform]
+      properties:
+        name: { type: string }
+        platform: { type: string, enum: [macos, ios, android, windows] }
 paths:
   /auth/register:
     post:
@@ -164,3 +187,58 @@ paths:
                 status: active
                 expires_at: '2026-07-12T08:00:00Z'
                 device_limit: 3
+  /devices:
+    get:
+      operationId: listDevices
+      summary: List devices bound to the account (for the device_limit cap)
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeviceList' }
+              example:
+                devices:
+                  - id: 22222222-2222-4222-8222-222222222222
+                    name: Sam's MacBook
+                    platform: macos
+                    last_seen_at: '2026-06-12T08:30:00Z'
+                    created_at: '2026-06-01T10:00:00Z'
+                device_limit: 3
+    post:
+      operationId: registerDevice
+      summary: Bind the current device; 409 if device_limit is exceeded
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceRegistration' }
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+              example:
+                id: 22222222-2222-4222-8222-222222222222
+                name: Sam's MacBook
+                platform: macos
+                last_seen_at: '2026-06-12T08:30:00Z'
+                created_at: '2026-06-01T10:00:00Z'
+        '409':
+          description: device limit exceeded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { code: device_limit_exceeded, message: device limit reached }
+  /devices/{deviceId}:
+    delete:
+      operationId: revokeDevice
+      summary: Unbind a device
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: no content }

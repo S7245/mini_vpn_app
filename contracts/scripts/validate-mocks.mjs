@@ -14,6 +14,8 @@ const manifest = {
   'user.json': 'User',
   'token-pair.json': 'TokenPair',
   'subscription.json': 'Subscription',
+  'device.json': 'Device',
+  'device-list.json': 'DeviceList',
 };
 
 const api = YAML.parse(readFileSync(resolve(root, 'backend-api.openapi.yaml'), 'utf8'));
