@@ -13,6 +13,7 @@ const root = resolve(here, '..');
 const manifest = {
   'user.json': 'User',
   'token-pair.json': 'TokenPair',
+  'subscription.json': 'Subscription',
 };
 
 const api = YAML.parse(readFileSync(resolve(root, 'backend-api.openapi.yaml'), 'utf8'));

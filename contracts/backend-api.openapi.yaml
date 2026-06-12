@@ -57,6 +57,17 @@ components:
       properties:
         old_password: { type: string }
         new_password: { type: string, minLength: 8 }
+    Subscription:
+      type: object
+      required: [plan, status, device_limit]
+      properties:
+        plan: { type: string, enum: [free, monthly, yearly] }
+        status: { type: string, enum: [active, expired] }
+        expires_at:
+          type: [string, "null"]
+          format: date-time
+          description: null for the free plan
+        device_limit: { type: integer, minimum: 1 }
 paths:
   /auth/register:
     post:
@@ -138,3 +149,18 @@ paths:
             schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
       responses:
         '204': { description: no content }
+  /subscription:
+    get:
+      operationId: getSubscription
+      summary: Current subscription state for the authenticated user
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Subscription' }
+              example:
+                plan: monthly
+                status: active
+                expires_at: '2026-07-12T08:00:00Z'
+                device_limit: 3
