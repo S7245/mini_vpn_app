@@ -16,6 +16,8 @@ const manifest = {
   'subscription.json': 'Subscription',
   'device.json': 'Device',
   'device-list.json': 'DeviceList',
+  'node-list.json': 'NodeList',
+  'select-best.json': 'SelectBestResponse',
 };
 
 const api = YAML.parse(readFileSync(resolve(root, 'backend-api.openapi.yaml'), 'utf8'));
