@@ -706,9 +706,9 @@ Under `components.schemas`, add:
         - $ref: '#/components/schemas/DedicatedNode'
       discriminator:
         propertyName: kind
-        mapping:
-          shared: '#/components/schemas/SharedNode'
-          dedicated: '#/components/schemas/DedicatedNode'
+      # NOTE: no `mapping:` — openapi-examples-validator@5 rejects it, and it
+      # is redundant here (oneOf + the `kind` const in each variant fully
+      # drives discrimination; we hand-write the backend, no OpenAPI codegen).
     NodeList:
       type: object
       required: [nodes]
