@@ -1,0 +1,143 @@
+# 前端工程设计：契约先行 + macOS 原生先行
+
+- 日期：2026-06-12
+- 状态：已批准（设计阶段完成，待转实施计划）
+- 关联 core 仓：`../mini_vpn`（数据面 VPN 核心，本工程不修改它）
+
+## 1. 背景与问题
+
+core（`mini_vpn`）是一个 learning-oriented 的数据面 VPN：TUN 拦截 → 用户态 TCP/IP →
+TLS+Yamux / QUIC datagram 隧道到 Upstream。它仍在演进中。
+
+需求：在 core 尚未完成时，并行启动多端前端（iOS / iPad / Mac / Android / Windows）。
+约束（单人主力维护）下，要求"开发更快、测试与平台一致性更优"。
+
+### 关键澄清：前端消费的不是数据面协议
+
+core 里的 `relay_protocol.rs`、QUIC datagram、yamux、fake-IP 全是**数据面**，跑在
+`客户端 core ↔ Upstream` 之间，前端 GUI 永不触碰。前端真正需要、且目前**完全不存在**的
+是另外两层契约：
+
+| 契约 | 双方 | 内容 | 现状 |
+|---|---|---|---|
+| ① 本地控制 API | GUI ↔ 本机 core | connect/disconnect、状态、实时流量、选节点、日志 | 无 |
+| ② 远端后端 API | App ↔ 云端控制面 | 登录鉴权、订阅、节点列表+权重、配置下发 | 无 |
+
+并行之所以可行：前端 mock 的是 ①②，与 core 的数据面演进互不阻塞。
+
+## 2. 决策记录（为什么是这条路）
+
+### 2.1 GUI 技术路线：原生 macOS 先行，全局栈决策延后（不全局押注）
+
+考察过三条路线：
+
+| | A. 原生单平台先行 + 契约先行 | B. Flutter 全平台 | C. 原生五端齐头并进 |
+|---|---|---|---|
+| 首平台出活速度 | 最快（无桥，已在 macOS）| 中（搭桥 + 工具链）| 慢（铺太开）|
+| 单人维护税 | 最低（一次只扛一个 GUI 栈）| 中（4th 栈 + FFI 桥）| 最高（3 GUI + 3 CI + 3 签名）|
+| 平台贴合度 | 高 | 低（处处外来感）| 高 |
+| 网络 API 跟进 | 直连 OS，无滞后 | Flutter 可能滞后 | 直连，无滞后 |
+| 锁死风险 | 最低（第二平台再定要不要 Flutter）| 较高 | 较高 |
+
+**选 A。** 关键论证（对单人 + VPN 特有）：
+
+1. **Flutter "帮你躲开原生生态" 对 VPN 是半个假象**：网络扩展（iOS
+   `NEPacketTunnelProvider`、Android `VpnService`、Win 服务/WFP、macOS system
+   extension）逼着你无论如何都得碰 Swift/Kotlin/C++。Flutter 只省 GUI 一层，且额外加
+   一套工具链 + 一道 FFI 桥。VPN 的 GUI 很简单（开关/列表/流量/设置），为省简单 GUI
+   多养一套栈 + 一道桥，单人来看常是净负。
+2. **"单人铺 5 端原生" 是更大的范围陷阱**：3 套 GUI + 3 条 CI 矩阵 + 3 套签名打包 +
+   跟 3 个 OS 升级周期，全压一个人；AI 写得快但 CI 矩阵、线上排障、版本适配不替你扛。
+3. **契约先行让栈决策可延后**：现在锁契约（与平台栈无关），先用原生把一个平台做成真
+   产品，全局栈决策留到第二平台、有数据时再做。
+
+对原始两个子问题的诚实结论：
+- "原生 + AI 更快吗"——**首平台：是**（已在 macOS，SwiftUI 无桥，AI 写 SwiftUI 强）；
+  **五端齐发：否**（单人多平台维护税复利累积）。
+- "测试/一致性更优吗"——一致性：原生赢"平台贴合"；测试：原生在矩阵层更差（N 条 CI），
+  对单人是实打实的税。所以贴合度优势是真的，多平台测试税正是会咬单人的地方。
+
+### 2.2 首平台：macOS
+
+理由：开发者在 darwin、core 也在此调试；SwiftUI 一套未来顺带覆盖 iPhone/iPad/Mac；
+无 FFI 桥，AI 辅助 SwiftUI 成熟。
+
+### 2.3 后端 ②：最小真后端（Rust + axum + SQLite）
+
+复用 Rust 栈、axum 成熟；SQLite 起步（控制面、非数据面热路径，符合"外部存储放控制面、
+不进数据面热路径"取向），将来换 Postgres 接口不变。**独立 crate，不并进 core 的 Cargo
+workspace**（保持隔离）。
+
+### 2.4 隔离约束
+
+core 仓正被另一 session 使用，本工程必须与其物理隔离：独立目录、独立 git 仓，core 仓零
+改动。① local-control schema 将来在 core session 空闲时再共享/对齐。
+
+## 3. 架构
+
+### 3.1 仓库结构（独立 monorepo）
+
+```
+mini_vpn_app/                      ← 新 git 仓，与 ../mini_vpn 隔离
+  docs/specs/2026-06-12-frontend-contract-first-macos-design.md
+  contracts/                       ← 单一事实源
+    backend-api.openapi.yaml       ② App ↔ 云端
+    local-control.schema.json      ① GUI ↔ 本机 core
+    mock/*.json                    每个接口的样例响应
+  macos-app/                       SwiftUI 工程（先吃 mock）
+  backend/                         Rust + axum + SQLite（实现 ②）
+```
+
+### 3.2 两层契约的字段范围
+
+**② backend-api（OpenAPI 3.1）** 首版三接口：
+- 登录/换 token（auth）
+- 节点列表（含权重、延迟、地区）
+- 订阅套餐（plan）
+- （后续）配置下发
+
+**① local-control（JSON schema）** —— 首版只定**消息语义**，传输层（unix socket /
+XPC / FFI）等接 core 时再绑（本就排在最后）：
+- 命令：connect / disconnect / selectNode
+- 状态机：disconnected → connecting → connected → error
+- 实时流量流：上下行速率 + 累计字节（VPN GUI 的核心动效）
+- 日志
+
+### 3.3 mock 策略（解耦关键）
+
+SwiftUI 内做**协议化 service 层**：`BackendService` / `ControlService` 各有 `Mock`
+实现，从 `contracts/mock/*.json` 读数据。换真实现只换注入，视图 / 视图模型不动。
+
+### 3.4 macOS app 组件（SwiftUI，菜单栏 + 主窗口）
+
+连接开关、节点列表、实时流量仪表盘、日志面板、设置。菜单栏常驻（macOS 习惯）先做。
+
+## 4. 落地顺序（每步独立验收）
+
+1. `contracts/` + mock 样例 —— 完成即解锁前后端并行
+2. backend 最小真实现（②）+ SQLite
+3. macOS app 对着 mock 跑通 5 个页面 → 再切真后端 ②
+4. （延后）① local-control 接 core —— 依赖 core 成熟度，排最后，不阻塞 1–3
+
+## 5. 测试与一致性
+
+- **契约即一致性边界**：backend 与 app 都对同一份 spec 做符合性校验，这是跨层一致性的
+  来源（比"同一套 UI 代码"更本质）。
+- contracts：OpenAPI 校验 + mock 符合性检查。
+- backend：Rust 集成测试打 ② 接口。
+- macOS：service 层 + view model 单测（mock 驱动）+ 视图快照测试。
+
+## 6. 明确不做（YAGNI / 范围边界）
+
+- 不在本阶段做 Android / iOS / Windows GUI（A 路线：第二平台再决策栈）。
+- 不在本阶段实现 ① 的真实传输层与 core 对接（仅定语义）。
+- 不引入 Flutter / 跨平台 GUI 框架。
+- 后端不上 Postgres / Redis / 服务发现（控制面后续话题，非首版）。
+- 不修改 core 仓任何文件。
+
+## 7. 待后续阶段处理
+
+- ① local-control 传输层落地（unix socket / XPC / FFI）与 core 对接。
+- 第二平台（Android / Windows）落地时的全局 GUI 栈复盘（继续原生 vs 引入 Flutter）。
+- 后端从 SQLite 迁 Postgres、加配置下发、服务发现 / 节点健康与权重动态化。
+- 契约在 core 仓与本仓之间的共享机制（待 core session 空闲对齐）。
