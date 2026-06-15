@@ -7,7 +7,10 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 src="$here/../../contracts/mock"
 dst="$here/../Core/Sources/MiniVPNCore/Resources/Mocks"
 mkdir -p "$dst"
-for f in user token-pair subscription device device-list node-list select-best; do
-  cp "$src/$f.json" "$dst/$f.json"
+shopt -s nullglob
+count=0
+for f in "$src"/*.json; do
+  cp "$f" "$dst/"
+  count=$((count + 1))
 done
-echo "synced mocks -> $dst"
+echo "synced $count mocks -> $dst"

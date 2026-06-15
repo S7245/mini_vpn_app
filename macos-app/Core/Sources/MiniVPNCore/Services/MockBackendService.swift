@@ -1,7 +1,7 @@
 import Foundation
 
-private struct DeviceListDTO: Decodable { let devices: [Device]; let deviceLimit: Int }
-private struct NodeListDTO: Decodable { let nodes: [Node] }
+struct DeviceListDTO: Decodable { let devices: [Device]; let deviceLimit: Int }
+struct NodeListDTO: Decodable { let nodes: [Node] }
 
 /// Reads the contract mock fixtures bundled in Resources/Mocks.
 public struct MockBackendService: BackendService {

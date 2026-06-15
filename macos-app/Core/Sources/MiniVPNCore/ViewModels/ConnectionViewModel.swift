@@ -4,10 +4,7 @@ import Combine
 @MainActor
 public final class ConnectionViewModel: ObservableObject {
     @Published public private(set) var state: ConnectionState = .disconnected
-    @Published public private(set) var upBps: Int = 0
-    @Published public private(set) var downBps: Int = 0
-    @Published public private(set) var upBytes: Int = 0
-    @Published public private(set) var downBytes: Int = 0
+    @Published public private(set) var traffic = TrafficStats(upBps: 0, downBps: 0, upBytes: 0, downBytes: 0)
     @Published public private(set) var logs: [LogLine] = []
 
     private let control: ControlService
@@ -33,8 +30,7 @@ public final class ConnectionViewModel: ObservableObject {
         switch event {
         case .state(let s): state = s
         case .stats(let st):
-            upBps = st.upBps; downBps = st.downBps
-            upBytes = st.upBytes; downBytes = st.downBytes
+            traffic = st
         case .log(let line):
             append(line)
         case .error(let detail):

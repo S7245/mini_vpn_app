@@ -7,8 +7,8 @@ public struct TrafficDashboardView: View {
 
     public var body: some View {
         HStack(spacing: 32) {
-            metric(title: "↓ Down", bps: connection.downBps, bytes: connection.downBytes)
-            metric(title: "↑ Up", bps: connection.upBps, bytes: connection.upBytes)
+            metric(title: "↓ Down", bps: connection.traffic.downBps, bytes: connection.traffic.downBytes)
+            metric(title: "↑ Up", bps: connection.traffic.upBps, bytes: connection.traffic.upBytes)
         }
         .padding()
     }
