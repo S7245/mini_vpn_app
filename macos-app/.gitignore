@@ -1,0 +1,5 @@
+App/MiniVPN.xcodeproj/
+App/*.xcodeproj/
+.DS_Store
+Core/.build/
+Core/Package.resolved
