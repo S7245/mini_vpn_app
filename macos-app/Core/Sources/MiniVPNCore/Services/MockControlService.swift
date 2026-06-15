@@ -1,38 +1,41 @@
 import Foundation
+import os
 
-/// Deterministic ① mock, implemented as an `actor` so all mutable state
-/// (`continuation`, byte counters, ticker) is serialized — no data race even
-/// with `liveTicker` on, where the ticker task and `send` run concurrently.
+/// Deterministic ① mock with **multi-subscriber broadcast**. `events()` may be
+/// called by more than one consumer (the app wires a RootView into both a
+/// WindowGroup and a MenuBarExtra, and SwiftUI may re-run `.onAppear`), so each
+/// call gets its own stream and every emitted event fans out to all live
+/// subscribers — matching how a real broadcasting transport behaves.
 ///
-/// Timing: `events()` is `nonisolated` and constructs the stream synchronously,
-/// but attaching the continuation hops onto the actor asynchronously. To make
-/// "events() then send()" reliable REGARDLESS of which lands on the actor
-/// first, events emitted before a continuation is attached are buffered in
-/// `pending` and flushed on attach. The AsyncStream's own unbounded buffer then
-/// retains them until the consumer iterates. `finish()` is called on the
-/// continuation in `deinit` so the stream terminates (no leaked pump task).
-public actor MockControlService: ControlService {
+/// All mutable state lives behind an `OSAllocatedUnfairLock`, so attach is
+/// SYNCHRONOUS (the continuation is registered before `events()` returns — no
+/// pre-attach race, no buffering needed) and the ticker/`send` fan-out is
+/// race-free. `onTermination` removes a subscriber when its stream ends (e.g.
+/// the consuming pump Task is cancelled), and `deinit` finishes every remaining
+/// subscriber.
+public final class MockControlService: ControlService, @unchecked Sendable {
+    private struct State {
+        var subscribers: [UUID: AsyncStream<ControlEvent>.Continuation] = [:]
+        var upBytes = 0
+        var downBytes = 0
+        var tickTask: Task<Void, Never>?
+    }
+
     private let liveTicker: Bool
-    private var continuation: AsyncStream<ControlEvent>.Continuation?
-    private var pending: [ControlEvent] = []
-    private var upBytes = 0
-    private var downBytes = 0
-    private var tickTask: Task<Void, Never>?
+    private let state = OSAllocatedUnfairLock(initialState: State())
 
     public init(liveTicker: Bool = true) {
         self.liveTicker = liveTicker
     }
 
-    public nonisolated func events() -> AsyncStream<ControlEvent> {
-        AsyncStream { cont in
-            Task { await self.attach(cont) }
+    public func events() -> AsyncStream<ControlEvent> {
+        let id = UUID()
+        return AsyncStream { cont in
+            state.withLock { $0.subscribers[id] = cont }
+            cont.onTermination = { [weak self] _ in
+                self?.state.withLock { $0.subscribers[id] = nil }
+            }
         }
-    }
-
-    private func attach(_ cont: AsyncStream<ControlEvent>.Continuation) {
-        continuation = cont
-        for e in pending { cont.yield(e) }
-        pending.removeAll()
     }
 
     public func send(_ command: ControlCommand) async throws {
@@ -50,32 +53,51 @@ public actor MockControlService: ControlService {
         }
     }
 
-    /// Yields if a continuation is attached, otherwise buffers until attach.
+    /// Fan out to every live subscriber. Continuations are copied out under the
+    /// lock, then yielded outside it (yield is non-blocking).
     private func emit(_ e: ControlEvent) {
-        if let continuation { continuation.yield(e) } else { pending.append(e) }
+        let conts = state.withLock { Array($0.subscribers.values) }
+        for c in conts { c.yield(e) }
     }
 
     private func emitStatsTick() {
-        upBytes += 64_000
-        downBytes += 480_000
-        emit(.stats(TrafficStats(upBps: 128_000, downBps: 940_000, upBytes: upBytes, downBytes: downBytes)))
+        let stats: TrafficStats = state.withLock {
+            $0.upBytes += 64_000
+            $0.downBytes += 480_000
+            return TrafficStats(upBps: 128_000, downBps: 940_000, upBytes: $0.upBytes, downBytes: $0.downBytes)
+        }
+        emit(.stats(stats))
     }
 
     private func startTicker() {
-        tickTask?.cancel()
-        tickTask = Task { [weak self] in
+        let task = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
-                guard let self else { return }
-                await self.emitStatsTick()
+                guard let self, !Task.isCancelled else { return }
+                self.emitStatsTick()
             }
         }
+        let old = state.withLock { s -> Task<Void, Never>? in
+            let prev = s.tickTask
+            s.tickTask = task
+            return prev
+        }
+        old?.cancel()
     }
 
-    private func stopTicker() { tickTask?.cancel(); tickTask = nil }
+    private func stopTicker() {
+        let old = state.withLock { s -> Task<Void, Never>? in
+            let prev = s.tickTask
+            s.tickTask = nil
+            return prev
+        }
+        old?.cancel()
+    }
 
     deinit {
-        tickTask?.cancel()
-        continuation?.finish()
+        state.withLock { s in
+            s.tickTask?.cancel()
+            for c in s.subscribers.values { c.finish() }
+        }
     }
 }
