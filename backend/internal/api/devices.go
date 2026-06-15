@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/S7245/mini_vpn_app/backend/internal/store"
 )
@@ -99,7 +100,14 @@ func (s *Server) handleRegisterDevice(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRevokeDevice(w http.ResponseWriter, r *http.Request) {
-	if err := s.q.DeleteDevice(r.Context(), store.DeleteDeviceParams{ID: chi.URLParam(r, "deviceId"), UserID: userID(r)}); err != nil {
+	deviceID := chi.URLParam(r, "deviceId")
+	// A malformed (non-uuid) id can match no row; treat the idempotent delete as
+	// a no-op success rather than surfacing a DB type error as 500.
+	if _, err := uuid.Parse(deviceID); err != nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if err := s.q.DeleteDevice(r.Context(), store.DeleteDeviceParams{ID: deviceID, UserID: userID(r)}); err != nil {
 		writeError(w, 500, "internal", "delete failed")
 		return
 	}

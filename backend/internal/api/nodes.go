@@ -11,10 +11,9 @@ import (
 
 func toNodeBody(n store.Node) map[string]any {
 	if n.Kind == "dedicated" {
-		var exp string
-		if n.ExpiresAt.Valid {
-			exp = n.ExpiresAt.Time.UTC().Format(time.RFC3339)
-		}
+		// expires_at is a required date-time in the contract; always emit a valid
+		// RFC3339 string (zero time if unset) rather than an invalid empty string.
+		exp := n.ExpiresAt.Time.UTC().Format(time.RFC3339)
 		return map[string]any{
 			"id": n.ID, "kind": "dedicated", "region": n.Region, "city": n.City,
 			"label": n.Label.String, "static_ip": n.StaticIp.String, "expires_at": exp,
@@ -48,7 +47,11 @@ func (s *Server) handleListNodes(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSelectBest(w http.ResponseWriter, r *http.Request) {
 	rows, err := s.q.ListSharedNodesByScore(r.Context())
-	if err != nil || len(rows) == 0 {
+	if err != nil {
+		writeError(w, 500, "internal", "node query failed")
+		return
+	}
+	if len(rows) == 0 {
 		writeError(w, 503, "no_nodes", "no eligible node")
 		return
 	}

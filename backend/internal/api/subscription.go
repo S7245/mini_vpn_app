@@ -1,6 +1,8 @@
 package api
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -14,8 +16,12 @@ type subscriptionBody struct {
 
 func (s *Server) handleGetSubscription(w http.ResponseWriter, r *http.Request) {
 	sub, err := s.q.GetSubscription(r.Context(), userID(r))
-	if err != nil {
+	if errors.Is(err, sql.ErrNoRows) {
 		writeError(w, 404, "not_found", "no subscription")
+		return
+	}
+	if err != nil {
+		writeError(w, 500, "internal", "subscription read failed")
 		return
 	}
 	var exp *string

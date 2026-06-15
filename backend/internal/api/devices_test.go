@@ -54,6 +54,20 @@ func TestDeviceLifecycleAndLimit(t *testing.T) {
 	}
 }
 
+func TestRevokeMalformedDeviceIDIsNoOp(t *testing.T) {
+	srv := testServer(t)
+	tok := registerAndToken(t, srv.URL, "delmal@b.com")
+	req, _ := http.NewRequest("DELETE", srv.URL+"/devices/not-a-uuid", nil)
+	req.Header.Set("Authorization", "Bearer "+tok)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != 204 {
+		t.Fatalf("malformed deviceId should be a 204 no-op, got %d", resp.StatusCode)
+	}
+}
+
 // TestConcurrentDeviceRegisterRespectsLimit exercises the FOR UPDATE row lock:
 // firing N concurrent registers against a device_limit of 1 must yield exactly
 // one 201 and the rest 409 — never two devices created (TOCTOU regression guard).

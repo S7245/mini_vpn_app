@@ -70,6 +70,9 @@ func TestListNodesAndSelectBest(t *testing.T) {
 			if n["static_ip"] == nil || n["static_ip"] == "" {
 				t.Fatalf("dedicated node missing static_ip: %+v", n)
 			}
+			if e, _ := n["expires_at"].(string); e == "" {
+				t.Fatalf("dedicated node expires_at must be a non-empty date-time, got %q: %+v", e, n)
+			}
 		case "shared":
 			sawShared = true
 			if n["tier"] == nil {
