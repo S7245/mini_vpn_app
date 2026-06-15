@@ -108,8 +108,12 @@ func (s *Server) handleRefresh(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 401, "invalid_token", "refresh token invalid")
 		return
 	}
-	// rotate: revoke the presented token, issue a fresh pair
-	_ = s.q.RevokeRefreshToken(r.Context(), rec.TokenHash)
+	// rotate: revoke the presented token first; if that fails, do NOT issue a
+	// fresh pair (otherwise the old token would remain usable).
+	if err := s.q.RevokeRefreshToken(r.Context(), rec.TokenHash); err != nil {
+		writeError(w, 500, "internal", "token rotate failed")
+		return
+	}
 	s.issueTokens(w, r, rec.UserID, 200)
 }
 
@@ -148,6 +152,10 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := s.q.UpdatePassword(r.Context(), store.UpdatePasswordParams{ID: u.ID, PasswordHash: hash}); err != nil {
 		writeError(w, 500, "internal", "update failed")
+		return
+	}
+	if err := s.q.RevokeAllUserTokens(r.Context(), u.ID); err != nil {
+		writeError(w, 500, "internal", "session revoke failed")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
