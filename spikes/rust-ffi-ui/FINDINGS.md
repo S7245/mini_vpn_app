@@ -181,3 +181,65 @@ call it **low-risk**. The two things still unmeasured and worth de-risking
 before betting on option C: (a) the **Xcode/xcframework** build integration vs
 this raw `swiftc` line, and (b) wiring a real **tokio/async** core through the
 boundary, which adds a foreign-executor layer this spike intentionally skipped.
+
+---
+
+## 7. Phase 2 — xcframework + SwiftUI (build tax + MainActor binding)
+
+Measured 2026-06-16. Built `MiniVPNFFI.xcframework` from the release static lib,
+linked it into a SwiftUI app via xcodegen, smoke-built with `xcodebuild`
+(`** BUILD SUCCEEDED **`), and launched the app to confirm the live
+Rust → FFI → MainActor → `@Published` path. This resolves remaining unknown (a).
+
+### Result — the binding works, on the main actor
+
+The SwiftUI `@MainActor` model received the full Rust stream
+(connecting → connected → log → 1 Hz stats) and **every event applied with
+`isMain=true` (10/10 lines)** — the `Task { @MainActor in … }` hop in the
+observer behaves exactly as Phase 1 predicted, and `@Published` down/up bytes
+updated live from the Rust ticker. Captured stdout:
+
+```
+[apply isMain=true] state(state: ...connecting)
+[apply isMain=true] state(state: ...connected)
+[apply isMain=true] stats(upBps: 128000, downBps: 940000, upBytes: 64000, downBytes: 480000)
+[apply isMain=true] log(level: "info", message: "tunnel established")
+[apply isMain=true] stats(... upBytes: 128000, downBytes: 960000)
+[apply isMain=true] stats(... upBytes: 192000, downBytes: 1440000)
+[apply isMain=true] stats(... upBytes: 256000, downBytes: 1920000)
+```
+
+### xcframework / xcodebuild friction (the 3 real things)
+
+1. **modulemap must be renamed to `module.modulemap`.** UniFFI emits
+   `minivpn_ffiFFI.modulemap`; `xcodebuild -create-xcframework -headers <dir>`
+   only picks up a file literally named `module.modulemap` (inner
+   `module minivpn_ffiFFI { … }` unchanged). One `cp`. Without it the clang
+   module isn't found and the generated Swift's `import minivpn_ffiFFI` fails.
+2. **A static-lib xcframework links cleanly via xcodegen** with just
+   `dependencies: [{ framework: ../MiniVPNFFI.xcframework, embed: false }]` —
+   xcodegen set the framework/header search paths; no manual flags, no rpath
+   (static), no embedding.
+3. **The generated `.swift` is a SOURCE, not part of the framework.** You add
+   `../generated/minivpn_ffi.swift` to the app target's sources; the xcframework
+   provides only the C/FFI clang module, and the typed Swift API compiles into
+   the app.
+
+### Incidental (not FFI)
+
+- One macOS-version slip in my own view code (`onChange(of:_:)` two-param form
+  is macOS 14+; target is 13 → one-line revert to the single-param form). Pure
+  SwiftUI, nothing to do with the boundary.
+- `setvbuf(stdout, nil, _IONBF, 0)` in the App init so a headless 4 s launch
+  flushes logs; `SWIFT_VERSION 5.0` so the UniFFI-generated Swift isn't held to
+  strict-concurrency errors (matches macos-app/Core's tools mode).
+
+### Bottom line — Xcode build tax for option C
+
+**Low and mechanical.** xcframework + xcodebuild is ~3 steps over the CLI (one
+modulemap rename, `-create-xcframework`, one xcodegen dependency line) and Just
+Worked; the MainActor binding is confirmed correct in a real SwiftUI app.
+**Option C's UI-over-FFI path is now de-risked end to end on macOS.** Remaining:
+(b) tokio/async on the boundary (foreign-executor layer), and — for production —
+a universal/CI build of the xcframework (this spike is arm64-only by choice).
+

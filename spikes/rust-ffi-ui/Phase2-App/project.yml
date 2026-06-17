@@ -1,0 +1,27 @@
+name: SpikeFFIApp
+options:
+  bundleIdPrefix: com.s7245.spike
+  deploymentTarget:
+    macOS: "13.0"
+targets:
+  SpikeFFIApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+      # The UniFFI-generated typed Swift API (built by build-phase2.sh).
+      - path: ../generated/minivpn_ffi.swift
+    dependencies:
+      # Static-library xcframework: links libminivpn_ffi.a and exposes the
+      # `minivpn_ffiFFI` clang module (module.modulemap inside Headers/).
+      - framework: ../MiniVPNFFI.xcframework
+        embed: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.s7245.spike.ffiapp
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        # UniFFI-generated Swift is not strict-concurrency clean; build in Swift 5
+        # language mode for the spike (matches the macos-app Core's tools mode).
+        SWIFT_VERSION: "5.0"
