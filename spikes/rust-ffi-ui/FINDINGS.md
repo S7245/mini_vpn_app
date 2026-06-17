@@ -308,3 +308,67 @@ viable for an Apple + Android footprint**; the real remaining costs to weigh in
 the review are the Android build/CI setup and the per-platform network-extension
 不可避税 (`VpnService`) — neither is an FFI problem.
 
+---
+
+## 9. Phase 4 — Android (Kotlin) consumer RUN on the host JVM
+
+Measured 2026-06-17. Phase 3 *generated* Kotlin bindings; Phase 4 actually
+*runs* them. No Android emulator/NDK is set up, so the UniFFI-generated Kotlin
+ran on the host JVM (OpenJDK 17) with JNA loading the Rust **darwin** dylib. The
+Kotlin code path — JNA load, callback interface, sealed-class enum, and async
+exports as `suspend fun`s — is identical to Android; only the native target
+differs (`.so` vs `.dylib`).
+
+### Setup friction (worth recording)
+
+- **`brew install kotlin` FAILED** — not kotlin itself (its bottle downloaded)
+  but its `openjdk` dependency download errored (`ghcr.io` HTTP/2
+  PROTOCOL_ERROR). Worked around by downloading the standalone
+  `kotlin-compiler-2.0.21.zip` and running it against the **system OpenJDK 17**.
+  Data point: brew's bundled-JDK dependency is a flaky/heavy path; the
+  standalone compiler + an existing JDK is lighter and avoided it.
+- Runtime deps are plain Maven Central jars: `jna 5.14.0` (1.9 MB) +
+  `kotlinx-coroutines-core-jvm 1.8.1` (1.5 MB). On real Android these are Gradle
+  deps (JNA ships an Android artifact).
+
+### Result — ran clean
+
+```
+== sync connect (callback stream) ==
+[main]     State(state=CONNECTING)
+[main]     State(state=CONNECTED)
+[main]     Stats(... upBytes=64000 ...)
+[main]     Log(level=info, message=tunnel established)
+[Thread-0] Stats(... upBytes=128000 ...)
+[Thread-1] Stats(... upBytes=192000 ...)
+[main]     State(state=DISCONNECTED)
+== await ping() ==          ping -> pong (awaited on tokio runtime)
+== await streamTicks(3u) == (3 stats)  ->  done
+```
+
+- The callback `interface EventObserver`, `sealed class ControlEvent`,
+  `enum class ConnectionState`, the sync methods, AND the tokio `suspend fun`s
+  (`ping`, `streamTicks`) all work from Kotlin. `await ping()` drove the Rust
+  tokio future and resumed the coroutine with the returned value.
+- Threading mirrors the Swift finding: the std::thread ticker callbacks arrive
+  on JNA worker threads (`Thread-0/1`); tokio async results resume on the
+  calling coroutine context (`main`). So Android needs the same dispatcher hop
+  (`withContext(Dispatchers.Main)` / a main dispatcher) for callback-delivered
+  events that touch UI — the analogue of the Swift MainActor hop.
+
+### Not covered (needs an Android toolchain)
+
+Cross-compiling the `.so` per ABI (NDK + `cargo-ndk` + the android rust targets —
+targets ARE installed: `aarch64-linux-android`, `x86_64-linux-android`; NDK is
+not), Gradle/AAR packaging, and running on an emulator/device.
+
+### Bottom line
+
+**The Kotlin/UniFFI consumer path is proven to RUN, not just generate.** With
+Phases 1–4, option C is de-risked across: the producer (Rust core — sync
+callbacks + tokio/async), the Apple consumer (SwiftUI + xcframework + MainActor),
+and the Android consumer mechanics (Kotlin + JNA + coroutines + suspend on the
+JVM). The remaining Android-specific work is purely build/packaging (NDK
+cross-compile + Gradle + emulator) — well-trodden and toolchain-gated, not a
+design risk — plus the non-FFI `VpnService` native tax.
+

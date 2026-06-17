@@ -10,3 +10,8 @@ Cargo.lock
 Phase2-App/*.xcodeproj/
 Phase2-App/build/
 .DS_Store
+# Phase 4 (Android-reach / host-JVM Kotlin) artifacts
+/KotlinHost/libs/
+/KotlinHost/app.jar
+/KotlinHost/.kotlinc/
+/android-libs/
