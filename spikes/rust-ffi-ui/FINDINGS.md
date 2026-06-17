@@ -356,11 +356,27 @@ differs (`.so` vs `.dylib`).
   (`withContext(Dispatchers.Main)` / a main dispatcher) for callback-delivered
   events that touch UI — the analogue of the Swift MainActor hop.
 
-### Not covered (needs an Android toolchain)
+### Cross-compile to Android `.so` — ATTEMPTED, env-blocked (not a C risk)
 
-Cross-compiling the `.so` per ABI (NDK + `cargo-ndk` + the android rust targets —
-targets ARE installed: `aarch64-linux-android`, `x86_64-linux-android`; NDK is
-not), Gradle/AAR packaging, and running on an emulator/device.
+Tried to also produce a real Android `.so`. Progress and the exact wall:
+- ✅ android rust targets installed (`aarch64-linux-android`, `x86_64-linux-android`).
+- ✅ `cargo-ndk 4.1.2` installed.
+- ✅ found an existing Android SDK at `~/Library/Android/sdk` (SDK 35 +
+  cmdline-tools + emulator) — so `sdkmanager` is available.
+- ❌ `sdkmanager "ndk;27.2.12479018"` **failed**: the r27c download corrupted at
+  ~33% (`Error on ZipFile unknown archive`), and free disk had fallen to ~5 GB —
+  not enough headroom to retry the ~3–4 GB NDK reliably. Removed the partial NDK.
+
+This is an **environment** block (flaky download + low disk), not a design risk.
+The cross-compile is one reliable-network + a few GB of disk away — the committed
+`build-android-so.sh` runs it once an NDK exists:
+`sdkmanager "ndk;<ver>"` → `./build-android-so.sh` (→ `cargo ndk -t arm64-v8a -p 24 -o android-libs build --release`, yielding `android-libs/arm64-v8a/libminivpn_ffi.so`). Rust's android targets are tier-2 and cargo-ndk is the standard wrapper, so this is mechanical.
+
+### Also not covered (needs more toolchain / a run target)
+
+Gradle/AAR packaging and running on an emulator/device (an emulator + system
+images are present on this machine, but a full Gradle Android app + boot + install
+is out of this spike's scope).
 
 ### Bottom line
 
