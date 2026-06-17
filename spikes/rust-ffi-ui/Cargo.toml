@@ -9,7 +9,8 @@ name = "minivpn_ffi"
 crate-type = ["staticlib", "cdylib", "lib"]
 
 [dependencies]
-uniffi = { version = "0.31", features = ["cli"] }
+uniffi = { version = "0.31", features = ["cli", "tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 
 [build-dependencies]
 uniffi = { version = "0.31", features = ["build"] }

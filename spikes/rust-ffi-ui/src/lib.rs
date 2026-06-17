@@ -165,3 +165,35 @@ impl ControlService {
         });
     }
 }
+
+// --- Phase 3: tokio/async across the FFI boundary ---------------------------
+//
+// Measures the "foreign-executor layer" unknown flagged in FINDINGS §6: how
+// much friction to expose a tokio-based async core over UniFFI and consume it
+// from Swift `await`. `async_runtime = "tokio"` (requires uniffi's `tokio`
+// feature) tells UniFFI to drive these futures on a tokio runtime, so they can
+// use tokio primitives (`tokio::time::sleep`). Additive — the sync path above
+// (Phase 1/2) is untouched.
+#[uniffi::export(async_runtime = "tokio")]
+impl ControlService {
+    /// Async request/response: awaits a tokio primitive, returns a value.
+    /// Swift consumes it as `let s = await service.ping()`.
+    pub async fn ping(&self) -> String {
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        "pong (awaited on tokio runtime)".to_string()
+    }
+
+    /// A tokio-driven event burst: pushes `count` stats ticks over the FFI
+    /// callback from inside a tokio async fn (not a std::thread) — the shape a
+    /// real tokio-based core would use. Swift: `await service.streamTicks(count: 3)`.
+    pub async fn stream_ticks(&self, count: u32) {
+        for _ in 0..count {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            let ev = {
+                let mut s = self.inner.lock().unwrap();
+                next_stats(&mut s)
+            };
+            self.observer.on_event(ev);
+        }
+    }
+}

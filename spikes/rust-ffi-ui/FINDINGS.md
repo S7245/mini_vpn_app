@@ -243,3 +243,68 @@ Worked; the MainActor binding is confirmed correct in a real SwiftUI app.
 (b) tokio/async on the boundary (foreign-executor layer), and — for production —
 a universal/CI build of the xcframework (this spike is arm64-only by choice).
 
+---
+
+## 8. Phase 3 — tokio/async boundary + Android (Kotlin) reach
+
+Measured 2026-06-16. Resolves remaining unknown (b), and adds the first
+Android-side data point — Android is now the confirmed second platform, so the
+spec §7.1 review gate is triggered and these spikes are its evidence.
+
+### tokio / async over FFI — works, light
+
+- Wiring: add the `tokio` dep + the `uniffi` `tokio` feature + a second impl
+  block tagged `#[uniffi::export(async_runtime = "tokio")]`. ~3 lines of config.
+  UniFFI drives the exported futures on a tokio runtime (pulls in `async-compat`
+  transitively), so they can use tokio primitives (`tokio::time::sleep`).
+- Swift consumes async exports as native `await`:
+  ```
+  == await ping() ==
+  ping -> pong (awaited on tokio runtime)
+  == await streamTicks(count: 3) (tokio task -> FFI callback) ==
+  [bg] stats(... upBytes: 64000 ...)
+  [bg] stats(... upBytes: 128000 ...)
+  [bg] stats(... upBytes: 192000 ...)
+  stream done
+  ```
+  `ping()` is a request/response future; `streamTicks()` pushes events over the
+  callback from inside a tokio async fn. Both work.
+- Threading is unchanged from Phase 1: callback-delivered events arrive on a
+  tokio worker thread (`[bg]`), so the same mandatory MainActor/main-dispatcher
+  hop applies. Async return values resolve back into the Swift `await`
+  continuation normally.
+- **Additive & non-breaking:** the Phase 1/2 sync path is untouched; re-verified
+  after the change — Phase 1 CLI still streams, Phase 2 app still
+  `** BUILD SUCCEEDED **` + `isMain=true`. (Gotcha: the shared `generated/` dir
+  is overwritten by whichever phase runs last, so after Phase 3 you must re-run
+  `build-phase2.sh` to rebuild the xcframework in lockstep — spike hygiene, not
+  a C concern.)
+- Bottom line: **a tokio-based core over FFI is low-friction.**
+
+### Android (Kotlin) reach — bindings generate; full build needs a toolchain
+
+- `uniffi-bindgen --language kotlin` produced a 2057-line `minivpn_ffi.kt` with
+  the same shapes: `class ControlService`, `interface EventObserver`,
+  `sealed class ControlEvent`, and the async exports mapped to Kotlin
+  `suspend fun`s (callback interface → Kotlin interface). **The same Rust core
+  yields an idiomatic Kotlin API for free** — no second logic implementation.
+- **NOT measured (toolchain absent on this machine):** no android rust targets
+  (`aarch64-linux-android` …), no NDK (`ANDROID_NDK_HOME` unset), no
+  Gradle/kotlinc. A real Android build additionally needs: install android rust
+  targets + NDK, cross-compile a `.so` per ABI, a Gradle module depending on
+  `net.java.dev.jna` (the UniFFI Kotlin runtime), and a coroutine main-dispatcher
+  hop (analogous to the Swift MainActor hop). That is the next spike if C is
+  chosen, and it needs Android Studio/NDK installed.
+
+### Bottom line for §7.1
+
+C's portable-core mechanic is de-risked on the **producer** side (Rust core:
+sync callbacks + tokio/async, both light) and the **Apple consumer** side end to
+end (xcframework + SwiftUI + MainActor). The **Android consumer** is confirmed
+reachable at the binding level (Kotlin generates cleanly, async → coroutines)
+but its full build/runtime tax (NDK cross-compile + Gradle/JNA + coroutine
+dispatch) is unmeasured pending an Android toolchain. Net: **C is technically
+viable for an Apple + Android footprint**; the real remaining costs to weigh in
+the review are the Android build/CI setup and the per-platform network-extension
+不可避税 (`VpnService`) — neither is an FFI problem.
+
