@@ -15,3 +15,11 @@ Phase2-App/build/
 /KotlinHost/app.jar
 /KotlinHost/.kotlinc/
 /android-libs/
+# Phase 4c (Android Gradle app) — artifacts + copied build inputs
+/AndroidApp/.gradle-dist/
+/AndroidApp/.gradle/
+/AndroidApp/build/
+/AndroidApp/app/build/
+/AndroidApp/local.properties
+/AndroidApp/app/src/main/jniLibs/
+/AndroidApp/app/src/main/java/uniffi/

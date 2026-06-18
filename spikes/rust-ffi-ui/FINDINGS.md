@@ -380,19 +380,45 @@ Two real friction points worth recording (neither is a C risk):
 - **`cargo-ndk` 4.x: the API-level flag is `--platform N`, NOT `-p N`** (`-p` is
   cargo's `--package`, so `-p 24` panics with `unknown package: 24`).
 
-### Still not done (needs Gradle + emulator/device)
+### On-device run (Phase 4c) — DONE ✅, ran on a real Android emulator
 
-Packaging the `.so` + generated Kotlin into a Gradle/AAR Android app and running
-it on an **emulator/device** (an emulator + system images ARE present on this
-machine). Both halves are now individually proven — the `.so` cross-compiles,
-and the generated Kotlin consumer runs (Phase 4, on the JVM with the dylib) — so
-the only thing an on-device run would add is exercising those two together on
-Android itself (same UniFFI Kotlin + JNA path, loading the `.so` instead of a
-dylib). Low residual risk; it's a packaging/run step, not a design question.
+Built a minimal Gradle Android app (`AndroidApp/`) bundling the cross-compiled
+arm64 `.so` (in `jniLibs/arm64-v8a`) + the generated Kotlin + JNA(aar) +
+coroutines, installed it on the existing **arm64** AVD (`Medium_Phone_API_36.0`,
+booted headless), launched it, and captured the `SPIKE` logcat — the full Rust
+core event stream running ON Android:
+
+```
+== connect (callback stream) ==
+[main]     State(state=CONNECTING)
+[main]     State(state=CONNECTED)
+[main]     Stats(... upBytes=64000 ...)
+[main]     Log(level=info, message=tunnel established)
+[Thread-2] Stats(... upBytes=128000 ...)
+[Thread-3] Stats(... upBytes=192000 ...)
+[main]     State(state=DISCONNECTED)
+== await ping() ==          ping -> pong (awaited on tokio runtime)
+== await streamTicks(3u) == (3 stats)  ->  == done ==
+```
+
+So on the device: JNA loaded the arm64 `.so`, the callback interface fired
+(ticker stats on Rust `Thread-2/3`, i.e. background — same dispatcher-hop need),
+and the tokio `suspend fun`s (`ping`, `streamTicks`) drove coroutines correctly.
+**Identical behaviour to the Swift app and the host-JVM run.**
+
+Android build friction worth recording (network, not design):
+- **AGP auto-installs `build-tools;34.0.0` by default and that SDK download hit
+  the same flaky-link ZipFile corruption** as the NDK. Fix: pin
+  `buildToolsVersion = "35.0.1"` (an already-installed version) so AGP never
+  downloads it. (First `assembleDebug` still took ~13 min downloading AGP + deps.)
+- JNA must be the **`@aar`** artifact on Android (`net.java.dev.jna:jna:5.14.0@aar`)
+  — it bundles JNA's own native dispatch `.so` per ABI; the plain jar won't load.
+- Used a standalone Gradle distribution (8.10.2) directly — no wrapper jar needed.
 
 ### Bottom line
 
-**The Kotlin/UniFFI consumer path is proven to RUN, not just generate.** With
+**The Kotlin/UniFFI consumer path is proven to RUN on real Android**, not just
+generate or run on the JVM. With
 Phases 1–4, option C is de-risked across: the producer (Rust core — sync
 callbacks + tokio/async), the Apple consumer (SwiftUI + xcframework + MainActor),
 and the Android consumer mechanics (Kotlin + JNA + coroutines + suspend on the
