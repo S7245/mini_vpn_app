@@ -13,7 +13,7 @@ export ANDROID_NDK_HOME="$NDK"
 echo "NDK: $ANDROID_NDK_HOME"
 
 echo "== cross-compile cdylib for arm64-v8a (aarch64-linux-android, API 24) =="
-cargo ndk -t arm64-v8a -p 24 -o ./android-libs build --release 2>&1 | tail -10
+cargo ndk -t arm64-v8a --platform 24 -o ./android-libs build --release 2>&1 | tail -10
 
 echo "== produced .so =="
 find android-libs -name '*.so' -exec ls -lh {} + 2>/dev/null

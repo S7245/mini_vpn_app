@@ -356,27 +356,39 @@ differs (`.so` vs `.dylib`).
   (`withContext(Dispatchers.Main)` / a main dispatcher) for callback-delivered
   events that touch UI — the analogue of the Swift MainActor hop.
 
-### Cross-compile to Android `.so` — ATTEMPTED, env-blocked (not a C risk)
+### Cross-compile to Android `.so` — DONE ✅
 
-Tried to also produce a real Android `.so`. Progress and the exact wall:
-- ✅ android rust targets installed (`aarch64-linux-android`, `x86_64-linux-android`).
-- ✅ `cargo-ndk 4.1.2` installed.
-- ✅ found an existing Android SDK at `~/Library/Android/sdk` (SDK 35 +
-  cmdline-tools + emulator) — so `sdkmanager` is available.
-- ❌ `sdkmanager "ndk;27.2.12479018"` **failed**: the r27c download corrupted at
-  ~33% (`Error on ZipFile unknown archive`), and free disk had fallen to ~5 GB —
-  not enough headroom to retry the ~3–4 GB NDK reliably. Removed the partial NDK.
+The Rust core cross-compiles to a real Android `.so`:
 
-This is an **environment** block (flaky download + low disk), not a design risk.
-The cross-compile is one reliable-network + a few GB of disk away — the committed
-`build-android-so.sh` runs it once an NDK exists:
-`sdkmanager "ndk;<ver>"` → `./build-android-so.sh` (→ `cargo ndk -t arm64-v8a -p 24 -o android-libs build --release`, yielding `android-libs/arm64-v8a/libminivpn_ffi.so`). Rust's android targets are tier-2 and cargo-ndk is the standard wrapper, so this is mechanical.
+```
+android-libs/arm64-v8a/libminivpn_ffi.so:
+  ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), dynamically linked
+```
 
-### Also not covered (needs more toolchain / a run target)
+The same tokio/async core builds for `aarch64-linux-android` (API 24) via
+`cargo ndk` in ~90 s. Steps: android rust targets (installed) + `cargo-ndk 4.1.2`
++ an NDK; then `./build-android-so.sh`.
 
-Gradle/AAR packaging and running on an emulator/device (an emulator + system
-images are present on this machine, but a full Gradle Android app + boot + install
-is out of this spike's scope).
+Two real friction points worth recording (neither is a C risk):
+- **`sdkmanager "ndk;27.2.12479018"` repeatedly failed** — the r27c download
+  truncated at ~33% then `Error on ZipFile unknown archive`, on two attempts
+  (not disk — 129 GB free on the retry). Worked around by downloading the NDK
+  **directly** from `dl.google.com` (`android-ndk-r25c-darwin.zip`, 717 MB) with
+  `curl -C - --retry` (resume survived a slow ~280 KB/s link), verifying the zip,
+  and pointing `ANDROID_NDK_HOME` at it. Takeaway: prefer a direct, resumable NDK
+  download over `sdkmanager` on a flaky link.
+- **`cargo-ndk` 4.x: the API-level flag is `--platform N`, NOT `-p N`** (`-p` is
+  cargo's `--package`, so `-p 24` panics with `unknown package: 24`).
+
+### Still not done (needs Gradle + emulator/device)
+
+Packaging the `.so` + generated Kotlin into a Gradle/AAR Android app and running
+it on an **emulator/device** (an emulator + system images ARE present on this
+machine). Both halves are now individually proven — the `.so` cross-compiles,
+and the generated Kotlin consumer runs (Phase 4, on the JVM with the dylib) — so
+the only thing an on-device run would add is exercising those two together on
+Android itself (same UniFFI Kotlin + JNA path, loading the `.so` instead of a
+dylib). Low residual risk; it's a packaging/run step, not a design question.
 
 ### Bottom line
 
