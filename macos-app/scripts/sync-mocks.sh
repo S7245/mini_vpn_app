@@ -5,7 +5,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 src="$here/../../contracts/mock"
-dst="$here/../Core/Sources/MiniVPNCore/Resources/Mocks"
+dst="$here/../../apple-core/Sources/MiniVPNCore/Resources/Mocks"
 mkdir -p "$dst"
 shopt -s nullglob
 count=0

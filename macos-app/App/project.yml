@@ -5,7 +5,7 @@ options:
     macOS: "13.0"
 packages:
   MiniVPNCore:
-    path: ../Core
+    path: ../../apple-core
 targets:
   MiniVPN:
     type: application

@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "MiniVPNCore",
-    platforms: [.macOS(.v13)],
+    platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .library(name: "MiniVPNCore", targets: ["MiniVPNCore"]),
     ],

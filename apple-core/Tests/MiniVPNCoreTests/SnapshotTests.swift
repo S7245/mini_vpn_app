@@ -1,3 +1,7 @@
+// The image snapshot renders via NSHostingView (AppKit) — macOS only. Guard the
+// whole file so the shared package still compiles for iOS. iOS view snapshots,
+// if wanted later, would use UIHostingView under `#if canImport(UIKit)`.
+#if canImport(AppKit)
 import XCTest
 import SwiftUI
 import SnapshotTesting
@@ -16,3 +20,4 @@ final class SnapshotTests: XCTestCase {
         assertSnapshot(of: NSHostingView(rootView: view), as: .image(size: CGSize(width: 320, height: 120)))
     }
 }
+#endif
