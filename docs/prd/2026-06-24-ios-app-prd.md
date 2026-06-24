@@ -117,7 +117,7 @@ iOS App
 |--------|----------|--------------|--------|----------------------------|----------|
 | FR-01 | 邮箱+密码登录，成功置会话态并进主界面 | US-01 | P0 | 输入合法邮箱+密码点登录→进 Connect | 7.1 |
 | FR-02 | 注册（邮箱+密码+确认密码） | US-01 | P0 | 两次密码一致且合法点注册→进主界面 | 7.2 |
-| FR-03 | 会话 gate：未登录→Auth，已登录→主界面 | US-01/US-07 | P0 | 启动/登出时按会话态切根视图 | 7.0 |
+| FR-03 | 会话 gate + token 持久化：未登录→Auth，已登录(持久 token)→主界面；登出清除 | US-01/US-07 | P0 | 重启 App 有持久 token→直接进主界面；登出后重启→Login | 7.0 |
 | FR-04 | 连接/断开 + 状态机 | US-02 | P0 | 点开关→connecting→connected；再点→disconnected | 7.3 |
 | FR-05 | 实时流量（上下行速率+累计） | US-03 | P0 | connected 后流量卡 1Hz 刷新 | 7.3 |
 | FR-06 | 节点列表（shared+dedicated 全字段） | US-04 | P0 | 进 Nodes 显示 mock 全部节点 | 7.4 |
@@ -322,7 +322,7 @@ stateDiagram-v2
 | 序号 | 名称 | 类型 | 必填项 | 默认值 | 数据来源 | 前置条件 | 业务规则 |
 |------|------|------|--------|--------|----------|----------|----------|
 | 1 | 自动优选 | Button | - | enabled | - | - | 1. 点击：调 `backend.selectBest()`，将返回 nodeId 设为选中<br/>2. loading 期间转圈禁用<br/>3. 失败：Toast/行内提示「优选失败，请重试」 |
-| 2 | 节点行 | Cell | - | - | backend.listNodes()（SharedNode/DedicatedNode） | - | 1. 展示：`region · city`（主）+ 副标题：shared→「Shared · {tier}」，dedicated→「{staticIp} · {label}」并带 `dedicated` 标签<br/>2. 右侧：`latencyMs ms`；shared 另显 `load %`<br/>3. 选中态：选中行蓝色高亮 + 对勾（ti-circle-check），未选灰圈<br/>4. 点击：设为 selectedNode（单选，互斥）<br/>5. dedicated 若 expiresAt 已过期：置灰不可选 + 标「已过期」【待确认：过期是否仍展示】 |
+| 2 | 节点行 | Cell | - | - | backend.listNodes()（SharedNode/DedicatedNode） | - | 1. 展示：`region · city`（主）+ 副标题：shared→「Shared · {tier}」，dedicated→「{staticIp} · {label}」并带 `dedicated` 标签<br/>2. 右侧：`latencyMs ms`；shared 另显 `load %`<br/>3. 选中态：选中行蓝色高亮 + 对勾（ti-circle-check），未选灰圈<br/>4. 点击：设为 selectedNode（单选，互斥）<br/>5. dedicated 若 expiresAt 已过期：仍展示但置灰、标「已过期」、不可选中（Q-01 已定） |
 | 3 | 列表 | List | - | - | listNodes | - | 1. 加载态：骨架/转圈<br/>2. 空态：无节点显示「暂无可用节点」<br/>3. 错误态：加载失败显示「加载失败，下拉重试」+ 下拉刷新<br/>4. 支持下拉刷新重新拉取 |
 
 **交互流程补充**
@@ -362,7 +362,7 @@ stateDiagram-v2
 |------|------|------|--------|--------|----------|----------|----------|
 | 1 | 订阅卡 | Card(只读) | - | - | backend.getSubscription()（plan/status/expiresAt/deviceLimit） | - | 1. 行：Plan={plan}；Status={status} 用色 pill（active 绿 / expired 灰红）；Expires={expiresAt 格式化为本地日期}<br/>2. expiresAt 为空时显示「—」（如终身/异常）<br/>3. 纯展示，不可编辑 |
 | 2 | 设备区头 | Text | - | - | listDevices()（count, deviceLimit） | - | 显示「{devices.count} of {deviceLimit}」 |
-| 3 | 设备行 | Cell(swipe) | - | - | listDevices().devices（name/platform/lastSeenAt） | - | 1. 展示：name（主）+「{platform} · {lastSeenAt 相对时间}」；当前设备标「this device」<br/>2. 左滑露出「解绑」(红)；点击弹确认「解绑后该设备需重新登录」→确认调 `backend.revokeDevice(id)`<br/>3. 成功：行移除、②计数-1<br/>4. 失败：行复位 + Toast「解绑失败，请重试」<br/>5. 边界：当前设备解绑【待确认：是否允许解绑当前设备/解绑后是否登出】 |
+| 3 | 设备行 | Cell(swipe) | - | - | listDevices().devices（name/platform/lastSeenAt） | - | 1. 展示：name（主）+「{platform} · {lastSeenAt 相对时间}」；当前设备标「this device」<br/>2. 左滑露出「解绑」(红)；点击弹确认「解绑后该设备需重新登录」→确认调 `backend.revokeDevice(id)`<br/>3. 成功：行移除、②计数-1<br/>4. 失败：行复位 + Toast「解绑失败，请重试」<br/>5. 边界：**当前设备不可解绑**——当前设备行不出"解绑"手势（左滑无操作或置灰），仅可解绑其他设备（Q-02 已定）|
 | 4 | 登出 | Button | - | enabled | - | - | 1. 点击：弹确认「确定登出？」→确认调 `backend.logout()` 并清本地会话 token<br/>2. 成功：切回 Login<br/>3. 失败：仍清本地会话并回 Login（登出以本地为准）|
 
 **交互流程补充**
@@ -396,7 +396,7 @@ stateDiagram-v2
 | TrafficStats（①事件） | upBps / downBps / upBytes / downBytes | Int×4 | stats 事件 |
 | LogLine（①事件，iOS 不展示） | level / message / ts | String/String/Date | 移动端不渲染 |
 
-**会话/本地态**：会话 token（内存持有，登出清除；真实现换 Keychain）；selectedNode（内存，跨 tab 共享）。
+**会话/本地态**：会话 token **持久化**（Q-03 已定：记住登录——mock 阶段 UserDefaults，真实现换 Keychain）；启动时会话 gate 若读到有效 token 则直接进主界面，否则进 Login；登出清除。selectedNode（内存，跨 tab 共享）。
 
 ## 九、接口需求
 
@@ -451,9 +451,9 @@ stateDiagram-v2
 
 | 编号 | 问题 | 领域 | 负责人 | 期望答复 | 状态 |
 |------|------|------|--------|----------|------|
-| Q-01 | dedicated 节点过期是否仍展示/置灰逻辑 | 产品/设计 | Sam | 进 M4 前 | 待回复 |
-| Q-02 | 是否允许解绑「当前设备」，解绑后是否强制登出 | 产品 | Sam | 进 M6 前 | 待回复 |
-| Q-03 | mock 阶段是否需要"记住登录态"持久化（重启免登录），还是每次启动回 Login | 产品/研发 | Sam | 进 M1 前 | 待回复 |
+| Q-01 | dedicated 节点过期展示 | 产品/设计 | Sam | — | ✅ 已定：仍展示、置灰、标「已过期」、不可选 |
+| Q-02 | 是否允许解绑当前设备 | 产品 | Sam | — | ✅ 已定：当前设备不可解绑 |
+| Q-03 | 会话持久化（重启免登录） | 产品/研发 | Sam | — | ✅ 已定：记住登录（UserDefaults→Keychain） |
 | Q-04 | 上线/埋点/增长指标 | 产品 | Sam | 接真后端时 | 待回复 |
 
 ## 十四、依赖与风险
