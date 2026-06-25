@@ -9,12 +9,14 @@ struct MainTabView: View {
     let backend: BackendService
     @StateObject private var connection: ConnectionViewModel
     @StateObject private var nodes: NodeListViewModel
+    @StateObject private var account: AccountViewModel
 
     init(auth: AuthViewModel, backend: BackendService, control: ControlService) {
         self.auth = auth
         self.backend = backend
         _connection = StateObject(wrappedValue: ConnectionViewModel(control: control))
         _nodes = StateObject(wrappedValue: NodeListViewModel(backend: backend))
+        _account = StateObject(wrappedValue: AccountViewModel(backend: backend))
     }
 
     var body: some View {
@@ -23,23 +25,8 @@ struct MainTabView: View {
                 .tabItem { Label("Connect", systemImage: "power") }
             NodeListView(model: nodes)
                 .tabItem { Label("Nodes", systemImage: "globe") }
-            accountStub
+            AccountView(account: account, auth: auth)
                 .tabItem { Label("Account", systemImage: "person") }
-        }
-    }
-
-    private var accountStub: some View {
-        VStack(spacing: 16) {
-            Text("Account").font(.title2).fontWeight(.medium)
-            Text("subscription + devices — coming soon").font(.footnote).foregroundStyle(.secondary)
-            Button(role: .destructive) {
-                Task { await auth.logout() }
-            } label: {
-                Text("Log out").frame(maxWidth: .infinity)
-            }
-            .padding(.vertical, 12)
-            .overlay(RoundedRectangle(cornerRadius: 8).stroke(.quaternary))
-            .padding(.horizontal, 24)
         }
     }
 }

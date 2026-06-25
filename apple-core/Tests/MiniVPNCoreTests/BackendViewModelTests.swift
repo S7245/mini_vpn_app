@@ -24,4 +24,25 @@ final class BackendViewModelTests: XCTestCase {
         XCTAssertEqual(vm.deviceLimit, 3)
         XCTAssertEqual(vm.devices.first?.platform, "macos")
     }
+
+    func testRevokeRemovesDevice() async throws {
+        let vm = AccountViewModel(backend: MockBackendService())
+        await vm.load()
+        let id = try XCTUnwrap(vm.devices.first?.id)
+        let before = vm.devices.count
+        await vm.revoke(id: id)
+        XCTAssertEqual(vm.devices.count, before - 1)
+        XCTAssertNil(vm.errorMessage)
+    }
+
+    func testCurrentDeviceIsNotRevocable() async throws {
+        let vm = AccountViewModel(backend: MockBackendService())
+        await vm.load()
+        let id = try XCTUnwrap(vm.devices.first?.id)
+        vm.currentDeviceId = id            // Q-02: this device cannot be revoked
+        XCTAssertFalse(vm.canRevoke(id))
+        let before = vm.devices.count
+        await vm.revoke(id: id)
+        XCTAssertEqual(vm.devices.count, before)  // unchanged
+    }
 }
