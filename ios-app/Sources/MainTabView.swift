@@ -7,11 +7,17 @@ import MiniVPNCore
 struct MainTabView: View {
     @ObservedObject var auth: AuthViewModel
     let backend: BackendService
-    let control: ControlService
+    @StateObject private var connection: ConnectionViewModel
+
+    init(auth: AuthViewModel, backend: BackendService, control: ControlService) {
+        self.auth = auth
+        self.backend = backend
+        _connection = StateObject(wrappedValue: ConnectionViewModel(control: control))
+    }
 
     var body: some View {
         TabView {
-            placeholder("Connect", "power")
+            ConnectionView(connection: connection)
                 .tabItem { Label("Connect", systemImage: "power") }
             placeholder("Nodes", "globe")
                 .tabItem { Label("Nodes", systemImage: "globe") }
