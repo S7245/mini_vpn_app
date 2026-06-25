@@ -65,7 +65,12 @@ class ConnectionViewModel : ViewModel() {
 
     fun connect() = service.send(ControlCommand.Connect("placeholder-node"))
 
-    fun disconnect() = service.send(ControlCommand.Disconnect)
+    // rust-core `stop()` joins the ticker thread (up to ~1s mid-sleep), so keep
+    // it off the main thread. Resulting Disconnected/Log events still flow back
+    // through the observer's Main hop.
+    fun disconnect() {
+        viewModelScope.launch(Dispatchers.IO) { service.send(ControlCommand.Disconnect) }
+    }
 
     override fun onCleared() {
         super.onCleared()
