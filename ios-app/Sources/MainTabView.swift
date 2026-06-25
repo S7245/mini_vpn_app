@@ -8,28 +8,23 @@ struct MainTabView: View {
     @ObservedObject var auth: AuthViewModel
     let backend: BackendService
     @StateObject private var connection: ConnectionViewModel
+    @StateObject private var nodes: NodeListViewModel
 
     init(auth: AuthViewModel, backend: BackendService, control: ControlService) {
         self.auth = auth
         self.backend = backend
         _connection = StateObject(wrappedValue: ConnectionViewModel(control: control))
+        _nodes = StateObject(wrappedValue: NodeListViewModel(backend: backend))
     }
 
     var body: some View {
         TabView {
-            ConnectionView(connection: connection)
+            ConnectionView(connection: connection, nodes: nodes)
                 .tabItem { Label("Connect", systemImage: "power") }
-            placeholder("Nodes", "globe")
+            NodeListView(model: nodes)
                 .tabItem { Label("Nodes", systemImage: "globe") }
             accountStub
                 .tabItem { Label("Account", systemImage: "person") }
-        }
-    }
-
-    private func placeholder(_ title: String, _ symbol: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: symbol).font(.largeTitle).foregroundStyle(.secondary)
-            Text("\(title) — coming soon").foregroundStyle(.secondary)
         }
     }
 

@@ -6,6 +6,7 @@ import MiniVPNCore
 /// traffic. Drives the shared, tested ConnectionViewModel.
 struct ConnectionView: View {
     @ObservedObject var connection: ConnectionViewModel
+    @ObservedObject var nodes: NodeListViewModel
 
     var body: some View {
         VStack(spacing: 22) {
@@ -16,8 +17,13 @@ struct ConnectionView: View {
 
             Button {
                 Task {
-                    if connection.isConnected { await connection.disconnect() }
-                    else { await connection.auto() }
+                    if connection.isConnected {
+                        await connection.disconnect()
+                    } else if let id = nodes.selectedNodeId {
+                        await connection.connect(nodeId: id)   // FR-09: honor manual pick
+                    } else {
+                        await connection.auto()
+                    }
                 }
             } label: {
                 ZStack {
@@ -49,13 +55,18 @@ struct ConnectionView: View {
     }
 
     private var nodeCard: some View {
-        HStack(spacing: 10) {
+        let selected = nodes.selectedNodeId.flatMap { id in nodes.nodes.first { $0.id == id } }
+        return HStack(spacing: 10) {
             Image(systemName: "globe").foregroundStyle(.tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Auto-select").fontWeight(.medium)
-                Text("lowest latency").font(.caption).foregroundStyle(.secondary)
+                Text(selected.map { "\($0.region) · \($0.city)" } ?? "Auto-select").fontWeight(.medium)
+                Text(selected != nil ? "manually selected" : "lowest latency")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
+            if let selected {
+                Text("\(selected.latencyMs) ms").font(.subheadline).monospacedDigit().foregroundStyle(.secondary)
+            }
             Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
         }
         .padding(14)
