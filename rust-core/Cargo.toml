@@ -1,0 +1,20 @@
+[package]
+name = "minivpn_core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "minivpn_core"
+crate-type = ["staticlib", "cdylib", "lib"]
+
+[dependencies]
+uniffi = { version = "0.31", features = ["cli", "tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
+
+[build-dependencies]
+uniffi = { version = "0.31", features = ["build"] }
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"

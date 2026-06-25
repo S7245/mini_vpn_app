@@ -1,0 +1,6 @@
+/target/
+/generated-kotlin/
+/generated-swift/
+/android-libs/
+Cargo.lock
+.DS_Store
