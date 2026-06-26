@@ -14,9 +14,9 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeviceUnknown
 import androidx.compose.material.icons.filled.Laptop
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -28,26 +28,37 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.toMutableStateList
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import com.minivpn.app.ui.model.DeviceUi
-import com.minivpn.app.ui.model.SampleData
-import com.minivpn.app.ui.model.SubscriptionUi
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.minivpn.app.di.LocalAppContainer
 import com.minivpn.app.ui.theme.StatusColors
+import com.minivpn.app.vm.AccountViewModel
+import uniffi.minivpn_core.Device
+import uniffi.minivpn_core.Subscription
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
- * 7.5 Account (Material 3). Subscription (read-only) + device list with
- * swipe-to-revoke (current device excluded, Q-02) + log out. Phase 3 static
- * data + local revoke; Phase 4 wires the backend.
+ * 7.5 Account (Material 3) over the real AccountViewModel. Subscription
+ * (read-only) + device list with swipe-to-revoke (current device excluded,
+ * Q-02) + log out.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AccountScreen(onLogout: () -> Unit) {
-    val devices = remember { SampleData.devices.toMutableStateList() }
+fun AccountScreen(
+    onLogout: () -> Unit,
+    vm: AccountViewModel = viewModel(factory = LocalAppContainer.current.factory),
+) {
+    val ui by vm.ui.collectAsState()
+    LaunchedEffect(Unit) { vm.load() }
     Scaffold(
         topBar = { CenterAlignedTopAppBar(title = { Text("Account") }) },
     ) { padding ->
@@ -56,24 +67,26 @@ fun AccountScreen(onLogout: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Subscription", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            SubscriptionCard(SampleData.subscription)
+            SubscriptionCard(ui.subscription)
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Devices", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(
-                    "${devices.size} of ${SampleData.deviceLimit}",
+                    "${ui.devices.size} of ${ui.deviceLimit}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            devices.forEach { device ->
-                DeviceRow(device, onRevoke = { devices.remove(device) })
+            ui.devices.forEach { device ->
+                DeviceRow(
+                    device = device,
+                    isCurrent = device.id == vm.currentDeviceId,
+                    canRevoke = vm.canRevoke(device.id),
+                    onRevoke = { vm.revoke(device.id) },
+                )
             }
 
-            TextButton(
-                onClick = onLogout,
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            ) {
+            TextButton(onClick = onLogout, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text("Log out", color = MaterialTheme.colorScheme.error)
             }
         }
@@ -81,15 +94,19 @@ fun AccountScreen(onLogout: () -> Unit) {
 }
 
 @Composable
-private fun SubscriptionCard(sub: SubscriptionUi) {
+private fun SubscriptionCard(sub: Subscription?) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            InfoRow("Plan") { Text(sub.plan, style = MaterialTheme.typography.bodyMedium) }
-            InfoRow("Status") { StatusChip(sub.status) }
-            InfoRow("Expires") { Text(sub.expires, style = MaterialTheme.typography.bodyMedium) }
+            if (sub == null) {
+                Text("—", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                InfoRow("Plan") { Text(sub.plan, style = MaterialTheme.typography.bodyMedium) }
+                InfoRow("Status") { StatusChip(sub.status) }
+                InfoRow("Expires") { Text(formatDate(sub.expiresAt), style = MaterialTheme.typography.bodyMedium) }
+            }
         }
     }
 }
@@ -105,8 +122,6 @@ private fun InfoRow(label: String, trailing: @Composable () -> Unit) {
 @Composable
 private fun StatusChip(status: String) {
     val active = status == "active"
-    // "active" reads as positive → fixed success green (consistent with the
-    // connected state, and stable under dynamic color). Other statuses neutral.
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = if (active) StatusColors.connectedContainer else MaterialTheme.colorScheme.surface,
@@ -122,10 +137,10 @@ private fun StatusChip(status: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DeviceRow(device: DeviceUi, onRevoke: () -> Unit) {
-    if (device.isCurrent) {
+private fun DeviceRow(device: Device, isCurrent: Boolean, canRevoke: Boolean, onRevoke: () -> Unit) {
+    if (!canRevoke) {
         // Current device cannot be revoked (Q-02) — no swipe affordance.
-        DeviceContent(device)
+        DeviceContent(device, isCurrent)
         return
     }
     val state = rememberSwipeToDismissBoxState(
@@ -147,12 +162,12 @@ private fun DeviceRow(device: DeviceUi, onRevoke: () -> Unit) {
             }
         },
     ) {
-        DeviceContent(device)
+        DeviceContent(device, isCurrent)
     }
 }
 
 @Composable
-private fun DeviceContent(device: DeviceUi) {
+private fun DeviceContent(device: Device, isCurrent: Boolean) {
     Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
@@ -163,7 +178,7 @@ private fun DeviceContent(device: DeviceUi) {
             Column {
                 Text(device.name, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    if (device.isCurrent) "${device.platform} · this device" else device.platform,
+                    if (isCurrent) "${device.platform} · this device" else device.platform,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -176,4 +191,13 @@ private fun deviceIcon(platform: String): ImageVector = when (platform) {
     "ios", "android" -> Icons.Filled.Smartphone
     "macos", "windows", "linux" -> Icons.Filled.Laptop
     else -> Icons.Filled.DeviceUnknown
+}
+
+private val DATE_FMT = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.US)
+
+private fun formatDate(iso: String?): String {
+    if (iso == null) return "—"
+    return runCatching {
+        Instant.parse(iso).atZone(ZoneId.systemDefault()).format(DATE_FMT)
+    }.getOrDefault(iso)
 }

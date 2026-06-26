@@ -8,12 +8,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,6 +28,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -35,18 +38,19 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
+import com.minivpn.app.vm.AuthViewModel
 
 /**
- * 7.1 Login (Material 3). Email + password with show/hide. Real auth lands in
- * Phase 4 (rust-core slice ②) — for now [onLogin] flips the local session gate.
+ * 7.1 Login (Material 3). Drives the real AuthViewModel (rust-core ② backend +
+ * SessionStore). On success the VM flips isAuthenticated and the gate navigates.
  */
 @Composable
-fun LoginScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
+fun LoginScreen(auth: AuthViewModel, onRegister: () -> Unit) {
+    val ui by auth.ui.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
-    val canSubmit = email.isNotEmpty() && password.isNotEmpty()
+    val canSubmit = email.isNotEmpty() && password.isNotEmpty() && !ui.isLoading
 
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -59,18 +63,10 @@ fun LoginScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
             modifier = Modifier.size(64.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Filled.Lock,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+                Icon(Icons.Filled.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
         }
-        Text(
-            "Welcome back",
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.padding(top = 16.dp),
-        )
+        Text("Welcome back", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 16.dp))
         Text(
             "sign in to continue",
             style = MaterialTheme.typography.bodyMedium,
@@ -104,11 +100,26 @@ fun LoginScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
         )
 
+        ui.errorMessage?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            )
+        }
+
         Button(
-            onClick = onLogin,
+            onClick = { auth.login(email, password) },
             enabled = canSubmit,
             modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-        ) { Text("Log in") }
+        ) {
+            if (ui.isLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+            } else {
+                Text("Log in")
+            }
+        }
 
         TextButton(onClick = onRegister, modifier = Modifier.padding(top = 4.dp)) {
             Text("New here? Create account")
@@ -117,17 +128,18 @@ fun LoginScreen(onLogin: () -> Unit, onRegister: () -> Unit) {
 }
 
 /**
- * 7.2 Register (Material 3). Email + password + confirm with client-side
- * mismatch check (error field + supporting text) before enabling Sign up.
+ * 7.2 Register (Material 3). Client-side mismatch check before enabling Sign up;
+ * backend errors surfaced inline. On success the gate navigates.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
+fun RegisterScreen(auth: AuthViewModel, onBack: () -> Unit) {
+    val ui by auth.ui.collectAsState()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     val mismatch = confirm.isNotEmpty() && confirm != password
-    val canSubmit = email.isNotEmpty() && password.length >= 6 && confirm == password && confirm.isNotEmpty()
+    val canSubmit = email.isNotEmpty() && password.length >= 6 && confirm == password && confirm.isNotEmpty() && !ui.isLoading
 
     Scaffold(
         topBar = {
@@ -179,11 +191,20 @@ fun RegisterScreen(onBack: () -> Unit, onRegistered: () -> Unit) {
                 } else null,
                 modifier = Modifier.fillMaxWidth(),
             )
+            ui.errorMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            }
             Button(
-                onClick = onRegistered,
+                onClick = { auth.register(email, password) },
                 enabled = canSubmit,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Sign up") }
+            ) {
+                if (ui.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                } else {
+                    Text("Sign up")
+                }
+            }
         }
     }
 }

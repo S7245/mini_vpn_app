@@ -16,37 +16,44 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.minivpn.app.di.LocalAppContainer
 import com.minivpn.app.ui.account.AccountScreen
 import com.minivpn.app.ui.auth.LoginScreen
 import com.minivpn.app.ui.auth.RegisterScreen
 import com.minivpn.app.ui.connect.ConnectScreen
 import com.minivpn.app.ui.nodes.NodesScreen
+import com.minivpn.app.vm.AuthViewModel
 
 /**
- * Session gate. A local bool stands in for real auth (Phase 4, rust-core slice
- * ②). Logged out → Login/Register flow; logged in → the Material 3 3-tab shell.
+ * Session gate driven by the real AuthViewModel (over rust-core ② backend +
+ * SessionStore). Restores a persisted session on init; logged out → Login/
+ * Register; logged in → the Material 3 3-tab shell.
  */
 @Composable
 fun MiniVpnApp() {
-    var loggedIn by rememberSaveable { mutableStateOf(false) }
-    if (!loggedIn) {
-        AuthFlow(onAuthenticated = { loggedIn = true })
+    val factory = LocalAppContainer.current.factory
+    val auth: AuthViewModel = viewModel(factory = factory)
+    val ui by auth.ui.collectAsState()
+    if (!ui.isAuthenticated) {
+        AuthFlow(auth)
     } else {
-        MainScaffold(onLogout = { loggedIn = false })
+        MainScaffold(onLogout = auth::logout)
     }
 }
 
 @Composable
-private fun AuthFlow(onAuthenticated: () -> Unit) {
+private fun AuthFlow(auth: AuthViewModel) {
     var showRegister by rememberSaveable { mutableStateOf(false) }
     if (showRegister) {
-        RegisterScreen(onBack = { showRegister = false }, onRegistered = onAuthenticated)
+        RegisterScreen(auth = auth, onBack = { showRegister = false })
     } else {
-        LoginScreen(onLogin = onAuthenticated, onRegister = { showRegister = true })
+        LoginScreen(auth = auth, onRegister = { showRegister = true })
     }
 }
 

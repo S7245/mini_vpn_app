@@ -63,7 +63,11 @@ class ConnectionViewModel : ViewModel() {
         }
     }
 
-    fun connect() = service.send(ControlCommand.Connect("placeholder-node"))
+    /** FR-09: connect to a manually-selected node. */
+    fun connect(nodeId: String) = service.send(ControlCommand.Connect(nodeId))
+
+    /** Connect with backend auto-selection (no manual pick). */
+    fun auto() = service.send(ControlCommand.Auto)
 
     // rust-core `stop()` joins the ticker thread (up to ~1s mid-sleep), so keep
     // it off the main thread. Resulting Disconnected/Log events still flow back

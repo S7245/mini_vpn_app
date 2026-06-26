@@ -27,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,13 +38,26 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.minivpn.app.control.ConnectionViewModel
+import com.minivpn.app.di.LocalAppContainer
+import com.minivpn.app.ui.nodes.city
+import com.minivpn.app.ui.nodes.id
+import com.minivpn.app.ui.nodes.region
 import com.minivpn.app.ui.theme.StatusColors
+import com.minivpn.app.vm.NodeListViewModel
 import uniffi.minivpn_core.ConnectionState
+import uniffi.minivpn_core.Node
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ConnectScreen(vm: ConnectionViewModel = viewModel()) {
+fun ConnectScreen(
+    vm: ConnectionViewModel = viewModel(),
+    nodesVm: NodeListViewModel = viewModel(factory = LocalAppContainer.current.factory),
+) {
     val ui by vm.ui.collectAsState()
+    val nodesUi by nodesVm.ui.collectAsState()
+    // Shared VM with NodesScreen (FR-09). Load so the selected node resolves.
+    LaunchedEffect(Unit) { nodesVm.load() }
+    val selectedNode = nodesUi.selectedNodeId?.let { sel -> nodesUi.nodes.firstOrNull { it.id == sel } }
     Scaffold(
         topBar = { CenterAlignedTopAppBar(title = { Text("MiniVPN") }) },
     ) { padding ->
@@ -59,7 +73,12 @@ fun ConnectScreen(vm: ConnectionViewModel = viewModel()) {
                 color = container,
                 shape = RoundedCornerShape(28.dp),
                 modifier = Modifier.size(120.dp).clickable(enabled = ui.state != ConnectionState.CONNECTING) {
-                    if (ui.state == ConnectionState.CONNECTED) vm.disconnect() else vm.connect()
+                    // FR-09: honor a manual pick; otherwise auto-select.
+                    when {
+                        ui.state == ConnectionState.CONNECTED -> vm.disconnect()
+                        nodesUi.selectedNodeId != null -> vm.connect(nodesUi.selectedNodeId!!)
+                        else -> vm.auto()
+                    }
                 },
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -82,7 +101,7 @@ fun ConnectScreen(vm: ConnectionViewModel = viewModel()) {
                 color = content,
             )
 
-            NodeCard()
+            NodeCard(selectedNode)
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricCard("Download", Icons.Filled.ArrowDownward, ui.downBps, ui.downBytes, Modifier.weight(1f))
@@ -93,8 +112,9 @@ fun ConnectScreen(vm: ConnectionViewModel = viewModel()) {
 }
 
 @Composable
-private fun NodeCard() {
-    // Phase 3: static "Auto-select". Phase 4 wires the selected node (FR-09).
+private fun NodeCard(selected: Node?) {
+    // FR-09: shows the manually-selected node, else Auto-select. The selection
+    // is the same NodeListViewModel instance the Nodes tab drives.
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.elevatedCardColors(
@@ -108,9 +128,12 @@ private fun NodeCard() {
         ) {
             Icon(Icons.Filled.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Column(modifier = Modifier.weight(1f)) {
-                Text("Auto-select", style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "lowest latency",
+                    selected?.let { "${it.region} · ${it.city}" } ?: "Auto-select",
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    if (selected != null) "manually selected" else "lowest latency",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
