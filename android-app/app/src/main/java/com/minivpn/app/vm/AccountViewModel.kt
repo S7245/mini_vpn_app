@@ -2,6 +2,7 @@ package com.minivpn.app.vm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +44,8 @@ class AccountViewModel(private val backend: BackendServiceInterface) : ViewModel
                     deviceLimit = list.deviceLimit,
                     errorMessage = null,
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _ui.value = _ui.value.copy(errorMessage = "$e")
             }
@@ -62,6 +65,8 @@ class AccountViewModel(private val backend: BackendServiceInterface) : ViewModel
                     devices = _ui.value.devices.filterNot { it.id == id },
                     errorMessage = null,
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _ui.value = _ui.value.copy(errorMessage = "$e")
             }

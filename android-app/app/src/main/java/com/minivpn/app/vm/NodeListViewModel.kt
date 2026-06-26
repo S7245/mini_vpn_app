@@ -2,6 +2,7 @@ package com.minivpn.app.vm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,8 @@ class NodeListViewModel(private val backend: BackendServiceInterface) : ViewMode
         viewModelScope.launch {
             try {
                 _ui.value = _ui.value.copy(nodes = backend.listNodes(), errorMessage = null)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _ui.value = _ui.value.copy(errorMessage = "$e")
             }
@@ -45,6 +48,8 @@ class NodeListViewModel(private val backend: BackendServiceInterface) : ViewMode
         viewModelScope.launch {
             try {
                 _ui.value = _ui.value.copy(selectedNodeId = backend.selectBest().nodeId, errorMessage = null)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _ui.value = _ui.value.copy(errorMessage = "$e")
             }

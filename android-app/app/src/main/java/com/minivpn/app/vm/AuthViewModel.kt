@@ -3,6 +3,7 @@ package com.minivpn.app.vm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minivpn.app.data.SessionStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +41,8 @@ class AuthViewModel(
         viewModelScope.launch {
             try {
                 backend.logout()
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // best-effort; local session is cleared regardless
             }
@@ -55,6 +58,8 @@ class AuthViewModel(
                 val tokens = op()
                 store.save(tokens)
                 _ui.value = _ui.value.copy(isAuthenticated = true, isLoading = false)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _ui.value = _ui.value.copy(
                     isAuthenticated = false,
