@@ -12,6 +12,15 @@ go run ./cmd/server     # migrates on boot, listens on :$PORT (default 8080)
 go run ./cmd/seed       # optional: idempotently seed a few shared dev nodes
 ```
 
+## Interactive API docs (Scalar)
+
+With the server running, open <http://localhost:8080/docs> for an interactive
+Scalar API reference. Click **Authorize**, paste an `access_token` from
+`POST /auth/register` or `/auth/login`, then call the protected endpoints — requests
+hit the live server (same origin). The page serves the live contract from
+`../contracts/backend-api.openapi.yaml`. Disable with `ENABLE_DOCS=false`
+(override the spec location with `OPENAPI_SPEC_PATH`).
+
 ## Test
 
 ```bash

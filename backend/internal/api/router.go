@@ -32,6 +32,12 @@ func NewServer(db *sql.DB, cfg config.Config) *chi.Mux {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 	})
 
+	// dev-only interactive API docs (public, gated by config flag)
+	if cfg.DocsEnabled {
+		r.Get("/docs", s.handleDocs)
+		r.Get("/openapi.yaml", s.handleOpenAPISpec)
+	}
+
 	// public
 	r.Post("/auth/register", s.handleRegister)
 	r.Post("/auth/login", s.handleLogin)

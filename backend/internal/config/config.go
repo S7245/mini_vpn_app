@@ -13,6 +13,9 @@ type Config struct {
 	Port        string
 	AccessTTL   time.Duration
 	RefreshTTL  time.Duration
+
+	DocsEnabled     bool
+	OpenAPISpecPath string
 }
 
 // Load reads config from env. DATABASE_URL and JWT_SECRET are required.
@@ -23,6 +26,9 @@ func Load() (Config, error) {
 		Port:        getenv("PORT", "8080"),
 		AccessTTL:   time.Hour,
 		RefreshTTL:  30 * 24 * time.Hour,
+
+		DocsEnabled:     getenv("ENABLE_DOCS", "true") != "false",
+		OpenAPISpecPath: getenv("OPENAPI_SPEC_PATH", "../contracts/backend-api.openapi.yaml"),
 	}
 	if c.DatabaseURL == "" {
 		return c, fmt.Errorf("DATABASE_URL is required")
