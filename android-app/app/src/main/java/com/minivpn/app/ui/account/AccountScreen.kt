@@ -28,8 +28,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -47,7 +47,7 @@ import com.minivpn.app.ui.theme.StatusColors
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountScreen(onLogout: () -> Unit) {
-    val devices = remember { mutableStateListOf(*SampleData.devices.toTypedArray()) }
+    val devices = remember { SampleData.devices.toMutableStateList() }
     Scaffold(
         topBar = { CenterAlignedTopAppBar(title = { Text("Account") }) },
     ) { padding ->
