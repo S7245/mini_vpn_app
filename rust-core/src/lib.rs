@@ -4,8 +4,9 @@
 //! Slice 1 (this file): the ① local-control `ControlService` — the connection
 //! state machine + event stream, MOCK impl. Shapes mirror the Swift
 //! `apple-core` ControlService (the reference oracle); productized from
-//! `spikes/rust-ffi-ui`. Slice 2 (backend ②: auth/nodes/subscription/devices)
-//! lands next.
+//! `spikes/rust-ffi-ui`. Slice 2 (`backend`/`models` modules): the ②
+//! BackendService (auth/nodes/subscription/devices), mock-decoding the same
+//! `contracts/mock` fixtures — mirrors Swift `MockBackendService`.
 //!
 //! NOTE: this is the GUI control/business core. The data-plane VPN core lives
 //! in the separate `mini_vpn` repo and is NOT touched here.
@@ -17,6 +18,10 @@ use std::sync::{
 use std::thread::JoinHandle;
 
 uniffi::setup_scaffolding!();
+
+// Slice ② — backend control plane (auth / nodes / subscription / devices).
+pub mod backend;
+pub mod models;
 
 /// Mirrors Swift `ConnectionState`.
 #[derive(Debug, Clone, PartialEq, uniffi::Enum)]

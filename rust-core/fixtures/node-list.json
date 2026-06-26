@@ -1,0 +1,33 @@
+{
+  "nodes": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "kind": "shared",
+      "region": "US",
+      "city": "Los Angeles",
+      "latency_ms": 142,
+      "load": 0.37,
+      "tier": "standard"
+    },
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "kind": "shared",
+      "region": "JP",
+      "city": "Tokyo",
+      "latency_ms": 58,
+      "load": 0.61,
+      "tier": "premium"
+    },
+    {
+      "id": "55555555-5555-4555-8555-555555555555",
+      "kind": "dedicated",
+      "region": "US",
+      "city": "San Jose",
+      "label": "my-static-1",
+      "static_ip": "203.0.113.9",
+      "expires_at": "2026-09-01T00:00:00Z",
+      "latency_ms": 130,
+      "load": 0.05
+    }
+  ]
+}
