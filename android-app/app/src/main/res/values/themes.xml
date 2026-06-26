@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Pure-Compose app: a bare framework theme with no ActionBar. The real
+         Material 3 look comes from the Compose MaterialTheme, not this XML
+         (this only styles the splash/window before Compose takes over). -->
+    <style name="Theme.MiniVPN" parent="@android:style/Theme.Material.Light.NoActionBar" />
+</resources>

@@ -1,0 +1,37 @@
+name: SpikeNetExt
+options:
+  bundleIdPrefix: com.spike.netext
+  deploymentTarget:
+    macOS: "13.0"
+targets:
+  SpikeNetExt:
+    type: application
+    platform: macOS
+    sources:
+      - App
+    dependencies:
+      - target: PacketTunnel
+      - sdk: NetworkExtension.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.spike.netext
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "0.1"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: App/App.entitlements
+        SWIFT_VERSION: "5.0"
+
+  PacketTunnel:
+    type: app-extension
+    platform: macOS
+    sources:
+      - Extension
+    dependencies:
+      - sdk: NetworkExtension.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.spike.netext.PacketTunnel
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: Extension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Extension/Extension.entitlements
+        SWIFT_VERSION: "5.0"

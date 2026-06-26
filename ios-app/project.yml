@@ -1,0 +1,27 @@
+name: MiniVPNiOS
+options:
+  bundleIdPrefix: com.s7245.minivpn
+  deploymentTarget:
+    iOS: "16.0"
+packages:
+  MiniVPNCore:
+    path: ../apple-core
+targets:
+  MiniVPNiOS:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    dependencies:
+      - package: MiniVPNCore
+        product: MiniVPNCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.s7245.minivpn.ios
+        GENERATE_INFOPLIST_FILE: YES
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        SWIFT_VERSION: "5.0"

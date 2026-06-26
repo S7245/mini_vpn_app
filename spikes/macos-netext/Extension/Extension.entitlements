@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- THE TAX, made explicit: a packet-tunnel NE provider REQUIRES this
+         managed entitlement. It is only honored with a provisioning profile
+         whose App ID has the NetworkExtension capability enabled in the Apple
+         Developer portal (paid account; Apple may gate packet-tunnel behind a
+         request). Without it the extension compiles but will not load. -->
+    <key>com.apple.developer.networking.networkextension</key>
+    <array>
+        <string>packet-tunnel-provider</string>
+    </array>
+</dict>
+</plist>
